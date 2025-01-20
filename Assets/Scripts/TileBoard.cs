@@ -1,8 +1,9 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
 using TMPro;
+using Unity.VisualScripting;
 using UnityEngine;
+using UnityEngine.Events;
 
 public class TileBoard : MonoBehaviour
 {
@@ -19,8 +20,8 @@ public class TileBoard : MonoBehaviour
     public TileCell cellPrefab;
     [Header("Grid Configure")]
     public Transform gridTransform;
-    public int rows;
-    public int columns;
+    public int row;
+    public int column;
     [Header("Data Tile State")]
     public TileState[] tileData;
     [Header("UI")]
@@ -34,8 +35,8 @@ public class TileBoard : MonoBehaviour
     private RectTransform rectTransform;
     private Dictionary<int, TileState> tileStates;
 
-    public event Action<int> OnScoreChanged;
-    public event Action<int> OnBestScoreChanged;
+    public UnityEvent<int> OnScoreChanged;
+    public UnityEvent<int> OnBestScoreChanged;
 
     public int CurrentScore
     {
@@ -57,63 +58,70 @@ public class TileBoard : MonoBehaviour
     }
     private void Awake()
     {
-        Instance = this;
+        if (Instance == null)
+        {
+            Instance = this;
+        }
+        else
+        {
+            Destroy(gameObject);
+            return;
+        }
+        SetUpGame();
+    }
+    
 
+    private void Update()
+    {
+        if (isPlay)
+        {
+            if (Input.GetKeyDown(KeyCode.A))
+            {
+                MoveTile(0, -1, 0, row, 0, column, 1, 1);
+            }
+            else if (Input.GetKeyDown(KeyCode.W))
+            {
+                MoveTile(-1, 0, 0, row, 0, column, 1, 1);
+            }
+            else if (Input.GetKeyDown(KeyCode.D))
+            {
+                MoveTile(0, 1, 0, row, column - 1, -1, 1, -1);
+            }
+            else if (Input.GetKeyDown(KeyCode.S))
+            {
+                MoveTile(1, 0, row - 1, -1, 0, column, -1, 1);
+            }
+        }
+    }
+    public void SetUpGame()
+    {
         rectTransform = GetComponent<RectTransform>();
-        gridTransform = transform.Find("Grid");
-        tiles = new Tile[rows, columns];
-        tileCells = new TileCell[rows, columns];
         tileStates = new Dictionary<int, TileState>();
         ConvertDataToDictionary();
-        CreateGrid();
     }
     public void ConvertDataToDictionary()
     {
         int start = 2;
-        for(int i=0; i< tileData.Length; i++)
+        for (int i = 0; i < tileData.Length; i++)
         {
             tileStates[start] = tileData[i];
-            start *= 2; 
+            start *= 2;
         }
     }
-    private void Start()
-    {
-        NewGame();
-    }
 
-    private void Update()
+    public void SetUpBoard()
     {
-        if(isPlay)
-        {
-            if (Input.GetKeyDown(KeyCode.A))
-            {
-                MoveTile(0, -1, 0, rows, 0, columns, 1, 1);
-            }
-            else if (Input.GetKeyDown(KeyCode.W))
-            {
-                MoveTile(-1, 0, 0, rows, 0, columns, 1, 1);
-            }
-            else if (Input.GetKeyDown(KeyCode.D))
-            {
-                MoveTile(0, 1, 0, rows, columns - 1, -1, 1, -1);
-            }
-            else if (Input.GetKeyDown(KeyCode.S))
-            {
-                MoveTile(1, 0, rows - 1, -1, 0, columns, -1, 1);
-            }
-        }
-        
-
-    }
-    public void NewGame()
-    {
+        ResetGrid();
         gameOverUI.SetActive(false);
         gameWinUI.SetActive(false);
-        isPlay = true;
-        CurrentScore = 0;
-        for (int i = 0; i < rows; i++)
+
+    }
+    public void ResetGrid()
+    {
+        for (int i = 0; i < row; i++)
         {
-            for (int j = 0; j < columns; j++) {
+            for (int j = 0; j < column; j++)
+            {
                 if (tiles[i, j] != null)
                 {
                     Destroy(tiles[i, j].gameObject);
@@ -122,8 +130,49 @@ public class TileBoard : MonoBehaviour
                 tileCells[i, j].occupied = false;
             }
         }
+    }
+
+    public void NewGame()
+    {
+        isPlay = true;
+        CurrentScore = 0;
+        SetUpBoard();
         CreateTile();
         CreateTile();
+
+    }
+    
+    public void Continue()
+    {
+        isPlay = true;
+        SetUpBoard();
+        LoadProgress(); 
+    }
+  
+    public void LoadProgress()
+    {
+        
+        
+        for (int i = 0; i < row; i++)
+        {
+            for (int j = 0; j < column; j++)
+            {
+                int numSave = PlayerPrefs.GetInt($"Tile[{i},{j}]", 0);
+                Debug.Log(numSave);
+                if (numSave > 0)
+                {
+                    Debug.Log("hehe");
+                    tiles[i, j] = Instantiate(tilePrefab, tileCells[i, j].transform);
+                    tiles[i, j].number=numSave;
+                    tiles[i, j].SetState(tileStates[numSave],numSave);
+                    tileCells[i, j].occupied = true;
+
+                }
+               
+            }
+        }
+        CurrentScore = PlayerPrefs.GetInt("CurrentScore", 0);
+        BestScore = PlayerPrefs.GetInt("BestScore", 0);
     }
     public void ContinueGame()
     {
@@ -131,19 +180,19 @@ public class TileBoard : MonoBehaviour
         isPlay = true;
 
     }
-    public void BoardReset()
-    {
 
-    }
     public void CreateGrid()
     {
-        SetSizeGrid(this.rows* tileSize, this.columns* tileSize);
-        for (int i = 0; i < rows; i++)
+        SetSizeGrid(this.row * tileSize, this.column * tileSize);
+        for (int i = 0; i < row; i++)
         {
-            Transform row=Instantiate(rowPrefab, gridTransform).transform;
-            for (int j = 0; j < columns; j++)
+            Transform rowtrans = Instantiate(rowPrefab, gridTransform);
+            rowtrans.transform.SetParent(gridTransform);
+            for (int j = 0; j < column; j++)
             {
-                tileCells[i,j]= Instantiate(cellPrefab, row);
+
+                tileCells[i,j]= Instantiate(cellPrefab, rowtrans);
+               
                 tileCells[i,j].coordinates=new Vector2Int(i,j);
             }
         }
@@ -181,6 +230,7 @@ public class TileBoard : MonoBehaviour
     }
     public void MoveTile(int incrementX, int incrementY, int startRow, int endRow, int startColumn, int endColumn, int rowStep, int columnStep)
     {
+        bool validMove = false;
         for (int i = startRow; i != endRow; i += rowStep)
         {
             for (int j = startColumn; j != endColumn; j += columnStep)
@@ -192,20 +242,22 @@ public class TileBoard : MonoBehaviour
                     tileCells[i, j].occupied = false;
 
                     int x = i + incrementX, y = j + incrementY;
-                    while (x >= 0 && y >= 0 && x < rows && y < columns && !tileCells[x, y].occupied)
+                    while (x >= 0 && y >= 0 && x < row && y < column && !tileCells[x, y].occupied)
                     {
                         x += incrementX;
                         y += incrementY;
                     }
-                    if (x >= 0 && y >= 0 && x < rows && y < columns && tiles[x, y]?.number == newTile.number)
+                    if (x >= 0 && y >= 0 && x < row && y < column && tiles[x, y]?.number == newTile.number)
                     {
                         int newNumber = tiles[x, y].number * 2;
                         CurrentScore += newNumber;
                         tiles[x, y].SetState(tileStates[newNumber], newNumber);
                         Destroy(newTile.gameObject);
+                        validMove = true;
                     }
                     else
                     {
+                        if (x - incrementX != i || y - incrementY != j) validMove = true;
                         tiles[x - incrementX, y - incrementY] = newTile;
                         newTile.transform.SetParent(tileCells[x - incrementX, y - incrementY].transform);
                         newTile.transform.localPosition = Vector3.zero;
@@ -215,7 +267,11 @@ public class TileBoard : MonoBehaviour
             }
 
         }
-        CreateTile();
+        if(validMove)
+        {
+            SoundManager.Instance.PlayMoveTileSFX();
+            CreateTile();
+        }
         SetBestScore();
         if (CheckWin())
         {
@@ -239,19 +295,30 @@ public class TileBoard : MonoBehaviour
             BestScore = CurrentScore;
         }
     }
-    //public void SetCurrentScoreText()
-    //{
-    //    currentScoreText.text= $"Your Score: {currentScore}";
-    //}
-    //public void SetBestScoreText()
-    //{
-    //    bestScoreText.text = $"Best Score: {bestScore}";
-    //}
+    public void SaveProgress()
+    {
+        PlayerPrefs.SetInt("CurrentScore", currentScore);
+        PlayerPrefs.SetInt("BestScore", bestScore);
+        PlayerPrefs.SetInt("Row", row);
+        PlayerPrefs.SetInt("Column", column);
+        for (int i = 0; i < row; i++)
+        {
+            for (int j = 0; j < column; j++)
+            {
+                if (tiles[i, j] != null)
+                {
+                    PlayerPrefs.SetInt($"Tile[{i},{j}]", tiles[i, j].number);
+                }
+
+            }
+        }
+        PlayerPrefs.Save();
+    }
     public bool CheckWin()
     {
-        for (int i = 0; i < rows; i++)
+        for (int i = 0; i < row; i++)
         {
-            for (int j = 0; j < columns; j++)
+            for (int j = 0; j < column; j++)
             {
                 if (tiles[i, j] != null && tiles[i, j].number >= winNumber)
                 {
@@ -263,22 +330,22 @@ public class TileBoard : MonoBehaviour
     }
     public bool CheckGameOver()
     {
-        for (int i = 0; i < rows; i++)
+        for (int i = 0; i < row; i++)
         {
-            for (int j = 0; j < columns; j++)
+            for (int j = 0; j < column; j++)
             {
                 if (tiles[i, j] == null)
                 {
                     return false; 
                 }
 
-                if (j < columns - 1 && tiles[i, j].number == tiles[i, j + 1]?.number)
+                if (j < column - 1 && tiles[i, j].number == tiles[i, j + 1]?.number)
                 {
                     return false; 
                 }
 
 
-                if (i < rows - 1 && tiles[i, j].number == tiles[i + 1, j]?.number)
+                if (i < row - 1 && tiles[i, j].number == tiles[i + 1, j]?.number)
                 {
                     return false; 
                 }
@@ -288,6 +355,7 @@ public class TileBoard : MonoBehaviour
     }
     public void GameOver()
     {
+        Debug.Log("Gameover");
         gameOverUI.SetActive(true);
         isPlay = false;
     }
@@ -296,6 +364,17 @@ public class TileBoard : MonoBehaviour
         gameWinUI.SetActive(true);
         isPlay = false;
     }
-
-
+    private void OnApplicationQuit()
+    {
+        SaveProgress();
+    }
+    public void SetUpBoardSize(int row = 4, int column = 4)
+    {
+        this.row = row;
+        this.column = column;
+        tiles = new Tile[row, column];
+        tileCells = new TileCell[row, column];
+        CreateGrid();
+    }
+    
 }

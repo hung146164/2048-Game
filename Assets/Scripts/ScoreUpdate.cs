@@ -10,12 +10,11 @@ public class ScoreUpdate : MonoBehaviour
     private void Awake()
     {
         textMeshProUGUI = GetComponent<TextMeshProUGUI>();
-        
+        TileBoard.Instance.OnScoreChanged.AddListener(ScoreChange);
+        Debug.Log("add");
+
     }
-    private void Start()
-    {
-        TileBoard.Instance.OnScoreChanged += ScoreChange;
-    }
+
     public void ScoreChange(int score)
     {
         textMeshProUGUI.text=score.ToString();

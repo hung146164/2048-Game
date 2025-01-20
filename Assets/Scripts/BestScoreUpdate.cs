@@ -9,12 +9,10 @@ public class BestScoreUpdate : MonoBehaviour
     private void Awake()
     {
         textMeshProUGUI = GetComponent<TextMeshProUGUI>();
+        TileBoard.Instance.OnBestScoreChanged.AddListener(ScoreChange);
 
     }
-    private void Start()
-    {
-        TileBoard.Instance.OnBestScoreChanged += ScoreChange;
-    }
+
     public void ScoreChange(int score)
     {
         textMeshProUGUI.text = score.ToString();
